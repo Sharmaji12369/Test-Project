@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local recovery artifacts (git bundles of this repo's own history)
+*.bundle
