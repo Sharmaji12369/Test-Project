@@ -3,9 +3,7 @@
 import {
   AppwriteException,
   ID,
-  Permission,
   Query,
-  Role,
   type Models,
   type RealtimeResponseEvent,
   type RealtimeSubscription,
@@ -469,15 +467,18 @@ export function useChat(
             body,
             read: false,
           },
-          // Row-level permissions are the real access control for a one-to-one
-          // conversation: only these two accounts can read it, only the
-          // recipient can flip `read`, and only the sender can delete.
-          permissions: [
-            Permission.read(Role.user(selfId)),
-            Permission.read(Role.user(recipientId)),
-            Permission.update(Role.user(recipientId)),
-            Permission.delete(Role.user(selfId)),
-          ],
+          // No per-row permissions are set here.
+          //
+          // Appwrite refuses a permission naming a role the caller does not
+          // hold, so a browser client cannot grant the recipient read access to
+          // the row it is writing — the attempt fails the whole write with a
+          // 401. Access is therefore governed by the table's permissions and a
+          // conversation is scoped by its conversationId query.
+          //
+          // The cost is real and documented in the README: the API would allow
+          // any signed-in user to read or modify any message, even though the
+          // UI never does. Enforcing it properly needs an Appwrite Function
+          // writing rows with a server key, which can grant those permissions.
         });
 
         pendingBodies.current.delete(messageId);

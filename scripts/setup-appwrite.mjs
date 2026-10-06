@@ -243,14 +243,22 @@ async function main() {
   );
 
   // --- messages -------------------------------------------------------------
-  // Only `create` is granted at table level. Reading is governed entirely by
-  // per-row permissions, which the app sets to exactly the two participants, so
-  // a conversation is private at the API layer and over Realtime — not merely
-  // filtered in the UI.
+  // Signed-in users may create, read and update messages at table level.
+  //
+  // Tighter per-row permissions are not reachable from a browser: Appwrite
+  // rejects a permission naming a role the caller does not hold, so a sender
+  // cannot grant the recipient read access to the row it writes. Conversations
+  // are therefore scoped by the conversationId query rather than enforced by
+  // permissions, which the README states plainly instead of implying a
+  // guarantee that is not there.
   console.log("\nTable: messages");
   await ensureTable(messagesTableId, {
     name: "Messages",
-    permissions: [Permission.create(Role.users())],
+    permissions: [
+      Permission.create(Role.users()),
+      Permission.read(Role.users()),
+      Permission.update(Role.users()),
+    ],
     rowSecurity: true,
   });
 

@@ -38,7 +38,8 @@ there when you come back.
 - Protected `/chat` route
 - A directory of all registered users
 - One-to-one conversations, selected from that directory
-- Every message carries its sender and recipient, and is readable only by those two accounts
+- Every message carries its sender and recipient, and conversations are scoped by a shared
+  conversation ID (see the caveat under *Known limitations*)
 - Switching between conversations, with history loaded on open
 - The active conversation is clearly highlighted
 - Live delivery over Appwrite Realtime — no polling, no refresh
@@ -281,21 +282,20 @@ A conversation ID is the two user IDs sorted and joined: `conversationIdFor(a, b
 value for both participants. One equality query fetches a whole conversation, and neither side has
 to look up a conversation record first.
 
-### Message privacy
+### Message scoping, and what it does not guarantee
 
-The `messages` table grants only `create` at table level. Everything else is per-row: when a message
-is written, the app attaches
+The `messages` table grants `create`, `read` and `update` to signed-in users, and a conversation is
+selected with an equality query on `conversationId`.
 
-```ts
-Permission.read(Role.user(senderId)),
-Permission.read(Role.user(recipientId)),
-Permission.update(Role.user(recipientId)),   // so the recipient can mark it read
-Permission.delete(Role.user(senderId))
-```
+The original design attached per-row permissions naming exactly the two participants, which would
+have made a conversation private at the API layer. That does not work from a browser: **Appwrite
+rejects a permission naming a role the caller does not itself hold**, so a sender cannot grant the
+recipient read access to the row it is writing, and the attempt fails the write with a 401.
 
-So a conversation is private at the API layer, not merely filtered in the UI. Appwrite will not
-return another pair's messages however the client queries, and Realtime only delivers events for
-rows the connected user is allowed to read.
+The honest consequence: scoping here is a property of the query, not of the permissions. The UI only
+ever requests one conversation, but a signed-in user calling the Appwrite API directly could read or
+modify any message. Closing that gap requires an Appwrite Function writing rows with a server API
+key — a key *can* grant those permissions — and dropping `read`/`update` back to `create` only.
 
 ### Listing registered users
 
@@ -376,8 +376,9 @@ tests/
 - No secret is committed. `.gitignore` excludes `.env*` while allowing `.env.example`.
 - The Appwrite API key is used only by `npm run setup`, is read from the environment, and is not
   referenced anywhere under `src/`.
-- Authorisation is enforced by Appwrite, not by the UI: per-row permissions scope every message to
-  its two participants, for queries and for Realtime alike.
+- Authentication is enforced by Appwrite: every request carries the user's session, and an
+  unauthenticated caller gets nothing. Message *authorisation*, however, is table-wide rather than
+  per-conversation — see *Known limitations*.
 - The `/chat` guard runs on the client, because the Appwrite session cookie belongs to the Appwrite
   domain rather than this app's. Reaching the route without a session therefore shows nothing and
   redirects — and would return no data in any case, since every request is authorised server-side.
@@ -388,11 +389,14 @@ tests/
 
 Honest notes on where this stops, and what each would take to finish.
 
-- **The recipient can update a message row.** Appwrite's row permissions are per-operation, not
-  per-column, so granting the recipient `update` so they can set `read` also lets them write other
-  fields. A hostile client could edit a received message's text in the database. Closing this
-  properly means moving the read-receipt write into an Appwrite Function that validates the change
-  server-side, and dropping `update` from the row's permissions.
+- **Messages are scoped by query, not enforced by permissions.** The `messages` table grants
+  `read` and `update` to every signed-in user, so someone calling the Appwrite API directly could
+  read or modify any message, including conversations they are not part of. The app never does, but
+  the API allows it. This is the single biggest gap, and it is not a design preference — a browser
+  client cannot grant the recipient per-row access, because Appwrite rejects a permission naming a
+  role the caller does not hold. The fix is an Appwrite Function that writes messages with a server
+  key, setting `read` for exactly the two participants and `update` for the recipient, after which
+  the table itself needs only `create`.
 - **No server-side route protection.** The session lives in the browser with the client SDK, so
   `/chat` is guarded on the client. Server-side guarding would mean issuing an Appwrite JWT, storing
   it in a first-party cookie, and checking it in middleware.
