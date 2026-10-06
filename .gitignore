@@ -41,5 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local recovery artifacts (git bundles of this repo's own history)
+# local artifacts (git bundles of this repo's own history, generated docs)
 *.bundle
+*.pdf
