@@ -57,11 +57,10 @@ export function profilesChannel(): string {
 export function describeError(error: unknown, fallback: string): string {
   if (error instanceof AppwriteException) {
     if (error.code === 401) {
-      return (
-        "Appwrite refused the request. Your session may have expired, or the " +
-        "table's permissions do not allow it — check that the messages table " +
-        "grants Create to all users."
-      );
+      // Appwrite's own text names the cause (an expired session, a table
+      // permission, or a row permission naming a role the caller does not
+      // hold), so pass it through rather than guessing on the user's behalf.
+      return `Appwrite refused the request: ${error.message || "not authorised."}`;
     }
     if (error.code === 404) {
       return (
