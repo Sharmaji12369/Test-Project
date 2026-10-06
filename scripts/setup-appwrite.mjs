@@ -4,11 +4,20 @@
  * table and a `messages` table, with the columns, indexes and permissions
  * described in the README.
  *
- * Run it once, from your machine, after creating an Appwrite project:
+ * Run it once, from your machine, after creating an Appwrite project. Put the
+ * values in `.env.local` (see `.env.example`) and simply run:
  *
- *   APPWRITE_ENDPOINT="https://fra.cloud.appwrite.io/v1" \
- *   APPWRITE_PROJECT_ID="..." \
- *   APPWRITE_API_KEY="..." \
+ *   npm run setup
+ *
+ * Environment variables set in the shell take precedence over the file, so this
+ * also works, on macOS/Linux:
+ *
+ *   APPWRITE_PROJECT_ID="..." APPWRITE_API_KEY="..." npm run setup
+ *
+ * or in PowerShell on Windows:
+ *
+ *   $env:APPWRITE_PROJECT_ID = "..."
+ *   $env:APPWRITE_API_KEY = "..."
  *   npm run setup
  *
  * The API key is a secret. It is read from the environment, is never written to
@@ -17,6 +26,8 @@
  *
  * Re-running is safe: anything that already exists is reported and skipped.
  */
+
+import { readFileSync } from "node:fs";
 
 import {
   Client,
@@ -27,6 +38,41 @@ import {
   TablesDB,
   TablesDBIndexType,
 } from "node-appwrite";
+
+/**
+ * Loads `.env.local` (then `.env`) into `process.env` without overwriting
+ * anything already set in the shell.
+ *
+ * Node does not read these files for a plain `node script.mjs`, and the
+ * `VAR=value command` prefix is bash-only — it fails on Windows PowerShell. So
+ * reading the file the project already uses is the one approach that works the
+ * same everywhere.
+ */
+function loadEnvFiles() {
+  for (const filename of [".env.local", ".env"]) {
+    let contents;
+    try {
+      contents = readFileSync(new URL(`../${filename}`, import.meta.url), "utf8");
+    } catch {
+      continue; // Absent is normal.
+    }
+
+    for (const line of contents.split(/\r?\n/)) {
+      const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+      if (!match) continue; // Blank lines and comments.
+
+      const [, key, rawValue] = match;
+      if (process.env[key] !== undefined) continue; // The shell wins.
+
+      // Strip surrounding quotes, and anything after an unquoted #.
+      const value = rawValue.trim();
+      const quoted = /^(["'])([\s\S]*)\1$/.exec(value);
+      process.env[key] = quoted ? quoted[2] : value.split(" #")[0].trim();
+    }
+  }
+}
+
+loadEnvFiles();
 
 const endpoint = process.env.APPWRITE_ENDPOINT?.trim();
 const projectId = process.env.APPWRITE_PROJECT_ID?.trim();
@@ -39,7 +85,8 @@ const messagesTableId = process.env.APPWRITE_MESSAGES_TABLE_ID?.trim() || "messa
 if (!endpoint || !projectId || !apiKey) {
   console.error(
     "Missing configuration. Set APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID and " +
-      "APPWRITE_API_KEY before running this script.\n\n" +
+      "APPWRITE_API_KEY in .env.local (copy .env.example), or in your shell, " +
+      "before running this script.\n\n" +
       "The API key needs the scopes: databases.read, databases.write, " +
       "tables.read, tables.write, collections.read, collections.write, " +
       "attributes.read, attributes.write, indexes.read, indexes.write.",

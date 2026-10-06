@@ -85,12 +85,7 @@ npm install
 
 cp .env.example .env.local        # then fill it in — see Appwrite setup below
 
-# provision the Appwrite backend (one time)
-APPWRITE_ENDPOINT="https://fra.cloud.appwrite.io/v1" \
-APPWRITE_PROJECT_ID="<your project id>" \
-APPWRITE_API_KEY="<your api key>" \
-npm run setup
-
+npm run setup                     # provision the Appwrite backend (one time)
 npm run dev                       # http://localhost:3000
 ```
 
@@ -120,12 +115,24 @@ attributes.read  attributes.write
 indexes.read     indexes.write
 ```
 
-Then run:
+Put the endpoint, project ID and key in `.env.local` (copy `.env.example`), then run:
 
 ```bash
-APPWRITE_ENDPOINT="https://fra.cloud.appwrite.io/v1" \
-APPWRITE_PROJECT_ID="<your project id>" \
-APPWRITE_API_KEY="<your api key>" \
+npm run setup
+```
+
+The script reads `.env.local`, so this works the same on macOS, Linux and Windows.
+Shell variables take precedence if you would rather not put the key in a file:
+
+```bash
+# macOS / Linux
+APPWRITE_PROJECT_ID="..." APPWRITE_API_KEY="..." npm run setup
+```
+
+```powershell
+# Windows PowerShell — note that the bash "VAR=value command" form does not work here
+$env:APPWRITE_PROJECT_ID = "..."
+$env:APPWRITE_API_KEY = "..."
 npm run setup
 ```
 
@@ -201,7 +208,9 @@ Copy `.env.example` to `.env.local` and fill it in.
 | `NEXT_PUBLIC_APPWRITE_DATABASE_ID` | yes | `chat` by default |
 | `NEXT_PUBLIC_APPWRITE_PROFILES_TABLE_ID` | no | Defaults to `profiles` |
 | `NEXT_PUBLIC_APPWRITE_MESSAGES_TABLE_ID` | no | Defaults to `messages` |
-| `APPWRITE_API_KEY` | setup only | **Secret.** Used by `npm run setup`, never by the app |
+| `APPWRITE_ENDPOINT` | setup only | Same endpoint, read by `npm run setup` |
+| `APPWRITE_PROJECT_ID` | setup only | Same project ID, read by `npm run setup` |
+| `APPWRITE_API_KEY` | setup only | **Secret.** Used by `npm run setup`, never by the app. Delete the key once setup has run |
 
 `NEXT_PUBLIC_*` values are embedded in the browser bundle. That is correct and expected: an
 endpoint, a project ID and table IDs are public identifiers, and Appwrite authorises every request
