@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { describeError } from "@/lib/appwrite";
+import { describeAuthError } from "@/lib/appwrite";
 import { Spinner } from "@/components/Spinner";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -50,9 +50,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       }
       router.replace("/chat");
     } catch (caught) {
-      setError(
-        describeError(caught, isSignup ? "Could not sign you up." : "Could not sign you in."),
-      );
+      setError(describeAuthError(caught, mode));
       setSubmitting(false);
     }
   }

@@ -119,6 +119,29 @@ async function ensure(label, create) {
 }
 
 /**
+ * Creates a table, or brings an existing one in line with the permissions and
+ * row-security setting this app needs.
+ *
+ * Creation alone is not enough on a re-run: a table left over from an earlier,
+ * partial run (or made by hand in the console) keeps whatever permissions it
+ * had, and a messages table without `create` for signed-in users makes every
+ * send fail with a 401. Applying the settings every time makes this script
+ * genuinely repair-capable rather than merely idempotent.
+ */
+async function ensureTable(tableId, { name, permissions, rowSecurity }) {
+  try {
+    await tablesDB.createTable({ databaseId, tableId, name, permissions, rowSecurity });
+    log(`created  table "${tableId}"`);
+    return;
+  } catch (error) {
+    if (error?.code !== ALREADY_EXISTS) throw error;
+  }
+
+  await tablesDB.updateTable({ databaseId, tableId, name, permissions, rowSecurity });
+  log(`updated  table "${tableId}" (permissions and row security reapplied)`);
+}
+
+/**
  * Appwrite provisions columns asynchronously. An index over a column that is
  * still `processing` fails, so wait for the whole table to settle first.
  */
@@ -160,17 +183,13 @@ async function main() {
   // auth users (that needs an API key), so the app maintains this itself and
   // every signed-in user may read it.
   console.log("\nTable: profiles");
-  await ensure(`table "${profilesTableId}"`, () =>
-    tablesDB.createTable({
-      databaseId,
-      tableId: profilesTableId,
-      name: "Profiles",
-      permissions: [Permission.read(Role.users()), Permission.create(Role.users())],
-      // Each row additionally carries owner permissions, so a user can only
-      // update or delete their own profile.
-      rowSecurity: true,
-    }),
-  );
+  await ensureTable(profilesTableId, {
+    name: "Profiles",
+    permissions: [Permission.read(Role.users()), Permission.create(Role.users())],
+    // Each row additionally carries owner permissions, so a user can only
+    // update or delete their own profile.
+    rowSecurity: true,
+  });
 
   await ensure("column userId", () =>
     tablesDB.createStringColumn({
@@ -229,15 +248,11 @@ async function main() {
   // a conversation is private at the API layer and over Realtime — not merely
   // filtered in the UI.
   console.log("\nTable: messages");
-  await ensure(`table "${messagesTableId}"`, () =>
-    tablesDB.createTable({
-      databaseId,
-      tableId: messagesTableId,
-      name: "Messages",
-      permissions: [Permission.create(Role.users())],
-      rowSecurity: true,
-    }),
-  );
+  await ensureTable(messagesTableId, {
+    name: "Messages",
+    permissions: [Permission.create(Role.users())],
+    rowSecurity: true,
+  });
 
   const messageColumns = [
     { key: "conversationId", size: 100 },
